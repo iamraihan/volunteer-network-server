@@ -5,12 +5,11 @@ require('dotenv').config()
 const app = express()
 const port = process.env.PORT || 5000
 
+const jwt = require('jsonwebtoken');
+
 //middleware
 app.use(cors())
 app.use(express.json())
-
-//volunteer-network
-//kdriwxn7N60Z9MGI
 
 
 
@@ -29,12 +28,37 @@ async function run() {
         await client.connect();
         const volunteerCollection = client.db("volunteerNetwork").collection("volunteer")
 
+        app.post('/login', (req, res) => {
+            const email = req.body
+            const token = jwt.sign(email, process.env.USER_ACCESS_TOKEN);
+            res.send({ token })
+
+
+        })
+
+
+        app.post('/volunteer', async (req, res) => {
+            const volunteer = req.body
+            const tokenInfo = req.headers.authorization
+            const [email, accessToken] = tokenInfo.split(" ")
+            const decoded = verifyToken(accessToken)
+            console.log(decoded)
+
+            if (email === decoded.email) {
+                const result = await volunteerCollection.insertOne(volunteer);
+                res.send({ Success: 'Product upload successfully' })
+            } else {
+                res.send({ Success: 'UnAuthorized Access' })
+            }
+
+        })
         app.get('/volunteer', async (req, res) => {
             const query = {}
             const cursor = volunteerCollection.find(query)
             const volunteer = await cursor.toArray()
             res.send(volunteer)
         })
+
     }
     finally { }
 }
@@ -48,3 +72,16 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log('This is volunteer network', port)
 })
+
+function verifyToken(token) {
+    let email;
+    jwt.verify(token, process.env.USER_ACCESS_TOKEN, function (err, decoded) {
+        if (err) {
+            email = 'Invalid Email'
+        } if (decoded) {
+            console.log(decoded)
+            email = decoded
+        }
+    });
+    return email
+}
